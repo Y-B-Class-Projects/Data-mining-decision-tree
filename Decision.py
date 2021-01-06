@@ -110,7 +110,7 @@ def classifier(dtree, traits):  # same as the former without recursion
         dtree = dtree[traits[dtree[1]] * 2]
     return dtree[1]
 
-
+#baruch
 e = [[1, 0, 0, 0, 0],
      [0, 1, 1, 0, 1],
      [1, 1, 1, 0, 0],
