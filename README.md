@@ -6,4 +6,4 @@ The model was built on 60,000 samples and tested on 10,000 additional samples.
 The database is located at http://yann.lecun.com/exdb/mnist/
 The model's success rate is 87%
 
-Written by Baruch Bakshet and Israel Rolnik.
+Written by Baruch Bakshet and Yisrael Rolnick.
