@@ -1,4 +1,5 @@
 import math
+import json
 
 
 def split(examples, used, trait):
@@ -16,7 +17,7 @@ def split(examples, used, trait):
     return newEx
 
 
-def isSameClass(examples):
+def isSameClass(examples, Class):
     """
     returns 0 if all the examples are classified as 0.
     returns 1 if all the examples are classified as 1.
@@ -25,36 +26,35 @@ def isSameClass(examples):
     returns -1 if there are more or equal ones than zeros.
     """
     if examples == []:
-        return 7
-    zo = [0, 0]  # zo is a counter of zeros and ones in class
+        return 11
+    zo = [0] * 10  # zo is a counter of zeros and ones in class
     for e in examples:
         zo[e[-1]] += 1
-    if zo[0] == 0:
-        return 1
-    if zo[1] == 0:
-        return 0
-    if zo[0] > zo[1]:
-        return -2
-    else:
-        return -1
+
+    Sort = sorted(zo)
+    if sum(Sort[:-1]) == 0 and Sort[-1] >= 1:
+        return zo.index(Sort[-1])
+
+    if Class == max(zo):
+        return Class - 10
+    return zo.index(max(zo)) - 10
 
 
 def infoInTrait(examples, i):
     """
     calculates the information in trait i using Shannon's formula
     """
-    count = [[0, 0], [0, 0]]  # [no. of ex. with attr.=0 and clas.=0,no. of ex. with attr.=0 and clas.=1],
+    count = [0] * 10, [0] * 10  # [no. of ex. with attr.=0 and clas.=0,no. of ex. with attr.=0 and clas.=1],
     # [no. of ex. with attr.=1 and clas.=0,no. of ex. with attr.=1 and clas.=1]
     for e in examples:
         count[e[i]][e[-1]] += 1
     x = 0
     # Shannon's formula
-    if count[0][0] != 0 and count[0][1] != 0:
-        x = count[0][0] * math.log((count[0][0] + count[0][1]) / count[0][0]) + \
-            count[0][1] * math.log((count[0][0] + count[0][1]) / count[0][1])
-    if count[1][0] != 0 and count[1][1] != 0:
-        x += count[1][0] * math.log((count[1][0] + count[1][1]) / count[1][0]) + \
-             count[1][1] * math.log((count[1][0] + count[1][1]) / count[1][1])
+    for i in range(2):
+        allI = sum([count[i][k] for k in range(10)])
+        for j in range(10):
+            if count[i][j] != 0 and count[i][j] != 0:
+                x += count[i][j] * math.log(allI / count[i][j])
     return x
 
 
@@ -75,28 +75,34 @@ def minInfoTrait(examples, used):
     return minTrait
 
 
-def build(examples):  # builds used
+def build(examples, d):  # builds used
     used = [1] * (len(examples[0]) - 1)  # used[i]=1 means that attribute i hadn't been used
-    return recBuild(examples, used, 0)
+    return [recBuild(i, examples, used[:], 0, d) for i in range(10)]  # build 10 Binary treas for 10 digits
 
 
-def recBuild(examples, used, parentMaj):
+def recBuild(Class, examples, used, parentMaj, d):
     """
     Builds the decision tree.
     parentMaj = majority class of the parent of this node. the heuristic is that if there is no decision returns parentMaj
     """
-    cl = isSameClass(examples)
-    if cl == 0 or cl == 1:  # all zeros or all ones
-        return [[], cl, []]
-    if cl == 7:  # examples is empty
-        return [[], parentMaj, []]
+    cl = isSameClass(examples, Class)
+    if 0 <= cl <= 9:  # all is belong to only one class between 0 to 9
+        return [[], cl == Class, []]
+    if cl == 11:  # examples is empty
+        return [[], parentMaj == Class, []]
     trait = minInfoTrait(examples, used)
+
+    isClass = (cl + 10 == Class)
+
     if trait == -1:  # there are no more attr. for splitting
-        return [[], cl + 2, []]  # cl+2 - makes cl 0/1 (-2+2 / -1+2)
-    x = split(examples, used, trait)
-    left = recBuild(x[0], used[:], cl + 2)
-    right = recBuild(x[1], used[:], cl + 2)
-    return [left, trait, right]
+        return [[], isClass, []]  # cl+2 - makes cl 0/1 (-2+2 / -1+2)
+    if d >= 0:
+        x = split(examples, used, trait)
+        left = recBuild(Class, x[0], used[:], cl + 10, d)
+        right = recBuild(Class, x[1], used[:], cl + 10, d)
+        return [left, trait, right]
+    if d == 0:
+        return [[], cl, []]
 
 
 def recClassifier(dtree, traits):  # dtree is the tree, traits is an example to be classified
@@ -110,7 +116,48 @@ def classifier(dtree, traits):  # same as the former without recursion
         dtree = dtree[traits[dtree[1]] * 2]
     return dtree[1]
 
-#baruch
+
+def convertFile(filename, num):
+    """
+    Convert file from arff format to txt, and normalize the values.
+    :param num: the amount of rows to read
+    """
+    f = open(filename, "r")
+    cFileName = filename.split(".")[0] + "-converted.txt"
+    cf = open(cFileName, "w+")
+
+    line = f.readline()
+    count = 0
+    while count < num and line != 0:
+        if not line.startswith('@'):
+            count += 1
+            line = line.split(',')
+            cLine = []
+
+            for pixel in line[:-1]:
+                if int(pixel) < 130:
+                    cLine.append(0)
+                else:
+                    cLine.append(1)
+            cf.write(','.join([str(int) for int in cLine]) + "," + line[-1])
+        line = f.readline()
+
+    f.close()
+    cf.close()
+
+
+def buildclassifier(filename, d):
+    e = []
+    f = open(filename, "r")
+    line = f.readline()
+    while line != "":
+        e.append([int(str) for str in line.split(',')])
+        line = f.readline()
+
+    f.close()
+    return build(e, d)
+
+
 e = [[1, 0, 0, 0, 0],
      [0, 1, 1, 0, 1],
      [1, 1, 1, 0, 0],
@@ -119,5 +166,58 @@ e = [[1, 0, 0, 0, 0],
      [1, 0, 1, 1, 0],
      [1, 0, 0, 1, 1]]
 
-t = build(e)
-print(classifier(t, [0, 1, 1, 1]))
+
+def printTree(t, tab=0):
+    if t:
+        print(tab * '--', t[1])
+        printTree(t[0], tab + 1)
+        printTree(t[2], tab + 1)
+
+
+def readFileToList(fileName):
+    f = open(fileName, "r")
+    line = f.readline()
+    ret = []
+    while line != "":
+        ret.append(([int(Str) for Str in line.split(',')]))
+        line = f.readline()
+    return ret
+
+
+def tester(tree, list):
+    CountT = 0
+    for l in list:
+        classifyAs = classify(tree, l)
+        if len(classifyAs) == 1 and classifyAs[0] == l[-1]:
+            CountT += 1
+    return 100 * CountT / len(list)
+
+
+def classify(tree, list):
+    ret = []
+    for Class in range(10):
+        if classifier(tree[Class], list):
+            ret.append(Class)
+    return ret
+
+
+# t = build(e)
+# printT(t[1])
+# print(classifier(t[1], [1, 1, 1, 0]))
+
+isLoadTreeFromFile = False
+
+convertFile("digits-training.arff", 60000)
+convertFile("digits-testing.arff", 10000)
+
+if not isLoadTreeFromFile:
+    tree = buildclassifier("digits-training-converted.txt", 20)
+    with open("save.txt", "w+") as fp:
+        json.dump(tree, fp)
+else:
+    with open("save.txt", "r") as fp:
+        tree = json.load(fp)
+
+testingList = readFileToList("digits-testing-converted.txt")
+print(tester(tree, testingList))
+
